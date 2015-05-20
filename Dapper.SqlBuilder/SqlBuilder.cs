@@ -15,6 +15,7 @@ namespace Dapper
             public string Sql { get; set; }
             public object Parameters { get; set; }
             public bool IsInclusive { get; set; }
+            public string UniqueKey { get; set; }
         }
 
         class Clauses : List<Clause>
@@ -106,7 +107,7 @@ namespace Dapper
             return new Template(this, sql, parameters);
         }
 
-        void AddClause(string name, string sql, object parameters, string joiner, string prefix = "", string postfix = "", bool IsInclusive = false)
+        void AddClause(string name, string sql, object parameters, string joiner, string prefix = "", string postfix = "", bool IsInclusive = false, string uniqueKey = null)
         {
             Clauses clauses;
             if (!data.TryGetValue(name, out clauses))
@@ -114,55 +115,62 @@ namespace Dapper
                 clauses = new Clauses(joiner, prefix, postfix);
                 data[name] = clauses;
             }
-            clauses.Add(new Clause { Sql = sql, Parameters = parameters, IsInclusive = IsInclusive });
+
+            if (!string.IsNullOrWhiteSpace(uniqueKey) && clauses.Any(x => x.UniqueKey == uniqueKey))
+            {
+                //join condition is already added, we should not add it again.
+                return;
+            }
+
+            clauses.Add(new Clause { Sql = sql, Parameters = parameters, IsInclusive = IsInclusive, UniqueKey = uniqueKey });
             seq++;
         }
 
         public SqlBuilder Intersect(string sql, dynamic parameters = null)
         {
-            AddClause("intersect", sql, parameters, joiner: "\nINTERSECT\n ", prefix: "\n ", postfix: "\n");
-            return this;
-        }
-        
-        public SqlBuilder InnerJoin(string sql, dynamic parameters = null)
-        {
-            AddClause("innerjoin", sql, parameters, joiner: "\nINNER JOIN ", prefix: "\nINNER JOIN ", postfix: "\n");
+            AddClause("intersect", sql, parameters, joiner: Environment.NewLine + "INTERSECT " + Environment.NewLine, prefix: Environment.NewLine + " ", postfix: Environment.NewLine);
             return this;
         }
 
-        public SqlBuilder LeftJoin(string sql, dynamic parameters = null)
+        public SqlBuilder InnerJoin(string sql, dynamic parameters = null, string uniqueKey = null)
         {
-            AddClause("leftjoin", sql, parameters, joiner: "\nLEFT JOIN ", prefix: "\nLEFT JOIN ", postfix: "\n");
+            AddClause("innerjoin", sql, parameters, joiner: Environment.NewLine + "INNER JOIN ", prefix: Environment.NewLine + "INNER JOIN ", postfix: Environment.NewLine, uniqueKey: uniqueKey);
             return this;
         }
 
-        public SqlBuilder RightJoin(string sql, dynamic parameters = null)
+        public SqlBuilder LeftJoin(string sql, dynamic parameters = null, string uniqueKey = null)
         {
-            AddClause("rightjoin", sql, parameters, joiner: "\nRIGHT JOIN ", prefix: "\nRIGHT JOIN ", postfix: "\n");
+            AddClause("leftjoin", sql, parameters, joiner: Environment.NewLine + "LEFT JOIN ", prefix: Environment.NewLine + "LEFT JOIN ", postfix: Environment.NewLine, uniqueKey: uniqueKey);
+            return this;
+        }
+
+        public SqlBuilder RightJoin(string sql, dynamic parameters = null, string uniqueKey = null)
+        {
+            AddClause("rightjoin", sql, parameters, joiner: Environment.NewLine + "RIGHT JOIN ", prefix: Environment.NewLine + "RIGHT JOIN ", postfix: Environment.NewLine, uniqueKey: uniqueKey);
             return this;
         }
 
         public SqlBuilder Where(string sql, dynamic parameters = null)
         {
-            AddClause("where", sql, parameters, " AND ", prefix: "WHERE ", postfix: "\n");
+            AddClause("where", sql, parameters, "AND ", prefix: "WHERE ", postfix: Environment.NewLine);
             return this;
         }
 
         public SqlBuilder OrWhere(string sql, dynamic parameters = null)
         {
-            AddClause("where", sql, parameters, " AND ", prefix: "WHERE ", postfix: "\n", IsInclusive: true);
+            AddClause("where", sql, parameters, "AND ", prefix: "WHERE ", postfix: Environment.NewLine, IsInclusive: true);
             return this;
         }
-        
+
         public SqlBuilder OrderBy(string sql, dynamic parameters = null)
         {
-            AddClause("orderby", sql, parameters, " , ", prefix: "ORDER BY ", postfix: "\n");
+            AddClause("orderby", sql, parameters, " , ", prefix: "ORDER BY ", postfix: Environment.NewLine);
             return this;
         }
 
         public SqlBuilder Select(string sql, dynamic parameters = null)
         {
-            AddClause("select", sql, parameters, " , ", prefix: "", postfix: "\n");
+            AddClause("select", sql, parameters, " , ", prefix: "", postfix: Environment.NewLine);
             return this;
         }
 
@@ -172,21 +180,21 @@ namespace Dapper
             return this;
         }
 
-        public SqlBuilder Join(string sql, dynamic parameters = null)
+        public SqlBuilder Join(string sql, dynamic parameters = null, string uniqueKey = null)
         {
-            AddClause("join", sql, parameters, joiner: "\nJOIN ", prefix: "\nJOIN ", postfix: "\n");
+            AddClause("join", sql, parameters, joiner: Environment.NewLine + "JOIN ", prefix: Environment.NewLine + "JOIN ", postfix: Environment.NewLine, uniqueKey: uniqueKey);
             return this;
         }
 
         public SqlBuilder GroupBy(string sql, dynamic parameters = null)
         {
-            AddClause("groupby", sql, parameters, joiner: " , ", prefix: "\nGROUP BY ", postfix: "\n");
+            AddClause("groupby", sql, parameters, joiner: " , ", prefix: Environment.NewLine + "GROUP BY ", postfix: Environment.NewLine);
             return this;
         }
 
         public SqlBuilder Having(string sql, dynamic parameters = null)
         {
-            AddClause("having", sql, parameters, joiner: "\nAND ", prefix: "HAVING ", postfix: "\n");
+            AddClause("having", sql, parameters, joiner: Environment.NewLine + "AND ", prefix: "HAVING ", postfix: Environment.NewLine);
             return this;
         }
     }
